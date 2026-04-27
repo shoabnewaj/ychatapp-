@@ -5,18 +5,17 @@ import org.apache.catalina.startup.Tomcat;
 public class Main {
     public static void main(String[] args) throws Exception {
 
-        int port = 8080;
-        if (System.getenv("PORT") != null) {
-            port = Integer.parseInt(System.getenv("PORT"));
-        }
+        String portEnv = System.getenv("PORT");
+        int port = (portEnv != null) ? Integer.parseInt(portEnv) : 8080;
 
         Tomcat tomcat = new Tomcat();
         tomcat.setPort(port);
 
         tomcat.getConnector();
 
-        String webappDir = new java.io.File("src/main/webapp").getAbsolutePath();
-        tomcat.addWebapp("", webappDir);
+        tomcat.addWebapp("", new java.io.File("src/main/webapp").getAbsolutePath());
+
+        System.out.println("Tomcat started on port: " + port);
 
         tomcat.start();
         tomcat.getServer().await();
