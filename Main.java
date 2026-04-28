@@ -2,6 +2,7 @@ package com.ychat;
 
 import java.io.File;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.startup.Tomcat;
 
 public class Main {
@@ -11,13 +12,13 @@ public class Main {
 
         Tomcat tomcat = new Tomcat();
         tomcat.setPort(port);
-
         tomcat.getConnector();
 
-        // FIXED PATH (jar থেকে load হবে)
-        String webappDir = new File("src/main/webapp").getAbsolutePath();
+        // temp directory
+        File baseDir = new File(System.getProperty("java.io.tmpdir"));
 
-        tomcat.addWebapp("", webappDir);
+        // context create
+        Context context = tomcat.addContext("", baseDir.getAbsolutePath());
 
         System.out.println("Tomcat started on port: " + port);
 
