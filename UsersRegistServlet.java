@@ -15,15 +15,12 @@ import jakarta.servlet.http.Part;
 import ychatapp.model.beans.UsersBeans;
 import ychatapp.model.bo.UsersLogic;
 
-
-
 @WebServlet("/UsersRegistServlet")
 @MultipartConfig
 public class UsersRegistServlet extends HttpServlet {
 
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-
         req.getRequestDispatcher("/WEB-INF/jsp/regist.jsp").forward(req, res);
     }
 
@@ -37,19 +34,19 @@ public class UsersRegistServlet extends HttpServlet {
         String name = req.getParameter("name");
 
         // ✅ image upload
-        Part part = req.getPart("user_img");
+        Part part = req.getPart("profile_pic"); // JSP input name
         String fileName = Paths.get(part.getSubmittedFileName()).getFileName().toString();
 
-        String user_img = null;
+        String user_img = null; // এখানে আপনি user_img নাম দিয়েছেন
 
         if (fileName != null && !fileName.isEmpty()) {
-
             String uploadPath = getServletContext().getRealPath("/img");
             File uploadDir = new File(uploadPath);
             if (!uploadDir.exists()) uploadDir.mkdir();
 
             user_img = System.currentTimeMillis() + "_" + fileName;
 
+            // ✅ ভুল ১: profile_pic এর বদলে user_img হবে
             part.write(uploadPath + File.separator + user_img);
         }
 
@@ -58,7 +55,10 @@ public class UsersRegistServlet extends HttpServlet {
         ub.setEmail(email);
         ub.setPass(pass);
         ub.setName(name);
-        ub.setUser_img(user_img);
+        
+        // ✅ ভুল ২: profile_pic এর বদলে user_img হবে
+        // ✅ ভুল ৩: Beans ক্লাসে মেথড চেক করুন: setProfile_pic (P বড় হাতের হতে পারে)
+        ub.setProfile_pic(user_img); 
 
         if (UsersLogic.userRegist(req, ub)) {
             req.getRequestDispatcher("/WEB-INF/jsp/registDone.jsp").forward(req, res);

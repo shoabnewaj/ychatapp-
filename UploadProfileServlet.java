@@ -15,8 +15,6 @@ import jakarta.servlet.http.Part;
 import ychatapp.model.beans.UsersBeans;
 import ychatapp.model.dao.UsersDAO;
 
-
-
 @WebServlet("/UploadProfileServlet")
 @MultipartConfig(
     fileSizeThreshold = 1024 * 1024 * 1,   // 1MB
@@ -46,24 +44,27 @@ public class UploadProfileServlet extends HttpServlet {
                 return;
             }
 
-            // 🔥 unique filename (VERY IMPORTANT)
-            String fileName = System.currentTimeMillis() + "_" +
-                    filePart.getSubmittedFileName();
+            // 🔥 unique filename
+            String fileName = System.currentTimeMillis() + "_" + filePart.getSubmittedFileName();
 
             // 📁 uploads path
             String uploadPath = getServletContext().getRealPath("/uploads");
-
             File uploadDir = new File(uploadPath);
             if (!uploadDir.exists()) {
                 uploadDir.mkdirs();
             }
 
-            // 💾 save file
+            // 💾 save file physically
             filePart.write(uploadPath + File.separator + fileName);
 
-            // 🗄 DB update (logged-in user)
+            // 🗄 DB update
             UsersDAO dao = new UsersDAO();
-            dao.updateProfilePic(ub.getId(), fileName);
+            boolean isUpdated = dao.updateProfilePic(ub.getId(), fileName);
+
+            if (isUpdated) {
+                // ✅ Session update (Jate sathe sathe chhobi change hoy)
+                ub.setProfile_pic(fileName); 
+            }
 
         } catch (Exception e) {
             e.printStackTrace();

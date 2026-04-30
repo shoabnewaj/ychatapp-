@@ -1,1 +1,1 @@
-web: mvn compile exec:java
+web: java -jar target/ychatapp-jar-with-dependencies.jar

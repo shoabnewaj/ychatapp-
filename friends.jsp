@@ -2,7 +2,10 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!DOCTYPE html>
 <html>
-<head><title>Friends Management</title><style>
+<head><title>Friends Management</title>
+<link rel="icon" type="image/png" href="<%=request.getContextPath()%>/icons/icon-192.png">
+<style>
+
     body { background: #f0f2f5; font-family: sans-serif; padding: 20px; }
     .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
     h3 { color: #6a1b9a; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; display: flex; align-items: center; }

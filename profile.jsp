@@ -5,6 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <title>${profileUser.name} | Profile</title>
+    <link rel="icon" type="image/png" href="<%=request.getContextPath()%>/icons/icon-192.png">
 
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -159,8 +160,8 @@
 
     <!-- PROFILE IMAGE -->
     <div class="img-container">
-        <img src="${not empty profileUser.user_img ? 'uploads/' + profileUser.user_img : 'https://via.placeholder.com/150'}"
-             class="profile-img">
+        <img src="${not empty profileUser.profile_pic ? 'img/' : ''}${not empty profileUser.profile_pic ? profileUser.profile_pic : 'https://via.placeholder.com/150'}"
+     class="profile-img">
     </div>
 
     <!-- 🆕 PROFILE PIC UPLOAD (ONLY OWN PROFILE) -->

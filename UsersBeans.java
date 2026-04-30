@@ -7,25 +7,25 @@ public class UsersBeans implements Serializable {
     private int id;
     private String email;
     private String name;
-    private String user_img;
+    private String profile_pic; // 👈 user_img er poriborte profile_pic dilam
 
     private String pass;
     private String hashedPass;
 
     public UsersBeans() {}
 
-    public UsersBeans(int id, String email, String name, String user_img) {
+    public UsersBeans(int id, String email, String name, String profile_pic) {
         this.id = id;
         this.email = email;
         this.name = name;
-        this.user_img = user_img;
+        this.profile_pic = profile_pic;
     }
 
     // ===== Getter =====
     public int getId() { return id; }
     public String getEmail() { return email; }
     public String getName() { return name; }
-    public String getUser_img() { return user_img; }
+    public String getProfile_pic() { return profile_pic; } // 👈 Method name update
     public String getPass() { return pass; }
     public String getHashedPass() { return hashedPass; }
 
@@ -33,7 +33,7 @@ public class UsersBeans implements Serializable {
     public void setId(int id) { this.id = id; }
     public void setEmail(String email) { this.email = email; }
     public void setName(String name) { this.name = name; }
-    public void setUser_img(String user_img) { this.user_img = user_img; }
+    public void setProfile_pic(String profile_pic) { this.profile_pic = profile_pic; } // 👈 Servlet ekhon eta khunje pabe
     public void setPass(String pass) { this.pass = pass; }
     public void setHashedPass(String hashedPass) { this.hashedPass = hashedPass; }
 }

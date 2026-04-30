@@ -6,6 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="<%=request.getContextPath()%>/icons/icon-192.png">
     <title>Notifications | Y-ChatApp</title>
     
     <style>
@@ -44,6 +45,26 @@
         .no-notif-icon { font-size: 50px; display: block; margin-bottom: 10px; opacity: 0.5; }
 
         .back-btn { text-decoration: none; color: purple; font-weight: bold; font-size: 14px; }
+        <a href="NotificationServlet" class="active-menu" style="position: relative;">
+    🔔 Notifications
+    <%-- Red Badge Signal --%>
+    <c:if test="${unreadCount > 0}">
+        <span style="
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #ff3b30;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        ">
+            ${unreadCount}
+        </span>
+    </c:if>
+</a>
     </style>
 </head>
 
@@ -60,6 +81,7 @@
             <a href="UsersProfileServlet">👤 Profile</a>
             <a href="UsersLogoutServlet">🚪 Logout</a>
         </div>
+        
     </div>
     <div class="user-card">
         <b>${ub.name}</b><br>
@@ -74,6 +96,7 @@
         <div class="header-row">
             <h2>🔔 Notifications</h2>
             <a href="UsersPostServlet" class="back-btn">Back to Home</a>
+            
         </div>
 
         <c:choose>
@@ -83,6 +106,7 @@
                     <p>No new notifications for you right now.</p>
                 </div>
             </c:when>
+            <c:when test="${message.contains('shared')}">📤</c:when>
             <c:otherwise>
                 <c:forEach var="message" items="${notifications}">
                     <div class="notif-item">
