@@ -1,0 +1,1 @@
+web: java -jar target/ychatapp-jar-with-dependencies.jar
