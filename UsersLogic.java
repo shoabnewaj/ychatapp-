@@ -32,6 +32,10 @@ public class UsersLogic {
         return new UsersDAO().updateUser(ub); 
     }
 
+    public static boolean resetPasswordByEmail(String email, String newPass) {
+        return new UsersDAO().updatePasswordByEmail(email, hashValue(newPass));
+    }
+
     // SHA-256 Hashing Method
     private static String hashValue(String pass) {
         if (pass == null || pass.isEmpty()) return null;

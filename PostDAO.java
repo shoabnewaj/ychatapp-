@@ -4,144 +4,620 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 import ychatapp.model.beans.UsersPost;
 
 public class PostDAO {
-    private static final String URL = "jdbc:mysql://localhost:3306/ychatapp";
+
+    private static final String URL = "jdbc:mysql://127.0.0.1:3306/ychatapp";
     private static final String USER = "root";
     private static final String PASS = "1234";
 
-    private Connection getConnection() throws SQLException {
-        try { Class.forName("com.mysql.cj.jdbc.Driver"); } catch (Exception e) {}
+    static {
+        try { Class.forName("com.mysql.cj.jdbc.Driver"); } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private Connection getConnection() throws Exception {
         return DriverManager.getConnection(URL, USER, PASS);
     }
 
-    public void addPost(int userId, String content, String fileName, String postType) {
-        String sql = "INSERT INTO posts(user_id, content, file_name, post_type) VALUES (?, ?, ?, ?)";
+    // ================= ADD POST (Feeling সহ আপডেট করা হয়েছে) =================
+    public boolean addPost(int userId, String content, String fileName, String postType, String feeling) {
+        String sql = "INSERT INTO posts(user_id, content, file_name, post_type, feeling) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ps.setString(2, content);
             ps.setString(3, fileName);
             ps.setString(4, postType);
-            ps.executeUpdate();
-        } catch (Exception e) { e.printStackTrace(); }
+            ps.setString(5, feeling);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
-    public void sharePost(int userId, String content, String ownerName, String fileName, String postType) {
+    // ================= GET ALL POSTS (Optimized - Single Connection, No N+1) =================
+    public List<UsersPost> getAllposts() {
+        List<UsersPost> list = new ArrayList<>();
 
-        String newContent = "🔄 Shared from " + ownerName + ": " + content;
+        String sql =
+            "SELECT p.id AS posts_id, u.name, p.user_id AS users_id, p.content, p.file_name, p.post_type, p.feeling, " +
+            "       u.profile_pic, p.created_at, p.share_count, " +
+            "       SUM(CASE WHEN pi.type='LIKE'     THEN 1 ELSE 0 END) AS like_count, " +
+            "       SUM(CASE WHEN pi.type='LOVE'     THEN 1 ELSE 0 END) AS love_count, " +
+            "       SUM(CASE WHEN pi.type='CARE'     THEN 1 ELSE 0 END) AS care_count, " +
+            "       SUM(CASE WHEN pi.type='HAHA'     THEN 1 ELSE 0 END) AS haha_count, " +
+            "       SUM(CASE WHEN pi.type='WOW'      THEN 1 ELSE 0 END) AS wow_count, " +
+            "       SUM(CASE WHEN pi.type='SAD'      THEN 1 ELSE 0 END) AS sad_count, " +
+            "       SUM(CASE WHEN pi.type='ANGRY'    THEN 1 ELSE 0 END) AS angry_count, " +
+            "       SUM(CASE WHEN pi.type='DISLIKES' THEN 1 ELSE 0 END) AS dislike_count, " +
+            "       COUNT(DISTINCT c.id) AS comment_count " +
+            "FROM posts p " +
+            "JOIN users u ON p.user_id = u.id " +
+            "LEFT JOIN post_interactions pi ON pi.post_id = p.id " +
+            "LEFT JOIN comments c ON c.post_id = p.id " +
+            "GROUP BY p.id, u.name, p.user_id, p.content, p.file_name, p.post_type, p.feeling, u.profile_pic, p.created_at, p.share_count " +
+            "ORDER BY p.id DESC";
 
-        String sql = "INSERT INTO posts(user_id, content, file_name, post_type) VALUES (?, ?, ?, ?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            CommentDAO commentDAO = new CommentDAO();
+            while (rs.next()) {
+                UsersPost post = new UsersPost(
+                        rs.getInt("posts_id"),
+                        rs.getString("name"),
+                        rs.getInt("users_id"),
+                        rs.getString("content"),
+                        rs.getString("file_name"),
+                        rs.getString("post_type"),
+                        rs.getString("feeling")
+                );
+                post.setProfile_pic(rs.getString("profile_pic"));
+
+                post.setTime(rs.getString("created_at"));
+
+                post.setLikeCount(rs.getInt("like_count"));
+                post.setLoveCount(rs.getInt("love_count"));
+                post.setCareCount(rs.getInt("care_count"));
+                post.setHahaCount(rs.getInt("haha_count"));
+                post.setWowCount(rs.getInt("wow_count"));
+                post.setSadCount(rs.getInt("sad_count"));
+                post.setAngryCount(rs.getInt("angry_count"));
+                post.setDislikes(rs.getInt("dislike_count"));
+                post.setCommentCount(rs.getInt("comment_count"));
+                post.setShareCount(rs.getInt("share_count"));
+
+                post.setComments(commentDAO.getCommentsByPostIdInternal(conn, post.getId()));
+
+                list.add(post);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // ================= GET VIDEO POSTS =================
+    public List<UsersPost> getVideoPosts() {
+        List<UsersPost> list = new ArrayList<>();
+
+        String sql =
+            "SELECT p.id AS posts_id, u.name, p.user_id AS users_id, p.content, p.file_name, p.post_type, p.feeling, " +
+            "       u.profile_pic, p.created_at, p.share_count, " +
+            "       SUM(CASE WHEN pi.type='LIKE'     THEN 1 ELSE 0 END) AS like_count, " +
+            "       SUM(CASE WHEN pi.type='LOVE'     THEN 1 ELSE 0 END) AS love_count, " +
+            "       SUM(CASE WHEN pi.type='CARE'     THEN 1 ELSE 0 END) AS care_count, " +
+            "       SUM(CASE WHEN pi.type='HAHA'     THEN 1 ELSE 0 END) AS haha_count, " +
+            "       SUM(CASE WHEN pi.type='WOW'      THEN 1 ELSE 0 END) AS wow_count, " +
+            "       SUM(CASE WHEN pi.type='SAD'      THEN 1 ELSE 0 END) AS sad_count, " +
+            "       SUM(CASE WHEN pi.type='ANGRY'    THEN 1 ELSE 0 END) AS angry_count, " +
+            "       SUM(CASE WHEN pi.type='DISLIKES' THEN 1 ELSE 0 END) AS dislike_count, " +
+            "       COUNT(DISTINCT c.id) AS comment_count " +
+            "FROM posts p " +
+            "JOIN users u ON p.user_id = u.id " +
+            "LEFT JOIN post_interactions pi ON pi.post_id = p.id " +
+            "LEFT JOIN comments c ON c.post_id = p.id " +
+            "WHERE p.post_type = 'video' " +
+            "GROUP BY p.id, u.name, p.user_id, p.content, p.file_name, p.post_type, p.feeling, u.profile_pic, p.created_at, p.share_count " +
+            "ORDER BY p.id DESC";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            CommentDAO commentDAO = new CommentDAO();
+            while (rs.next()) {
+                UsersPost post = new UsersPost(
+                        rs.getInt("posts_id"),
+                        rs.getString("name"),
+                        rs.getInt("users_id"),
+                        rs.getString("content"),
+                        rs.getString("file_name"),
+                        rs.getString("post_type"),
+                        rs.getString("feeling")
+                );
+                post.setProfile_pic(rs.getString("profile_pic"));
+                post.setTime(rs.getString("created_at"));
+
+                post.setLikeCount(rs.getInt("like_count"));
+                post.setLoveCount(rs.getInt("love_count"));
+                post.setCareCount(rs.getInt("care_count"));
+                post.setHahaCount(rs.getInt("haha_count"));
+                post.setWowCount(rs.getInt("wow_count"));
+                post.setSadCount(rs.getInt("sad_count"));
+                post.setAngryCount(rs.getInt("angry_count"));
+                post.setDislikes(rs.getInt("dislike_count"));
+                post.setCommentCount(rs.getInt("comment_count"));
+                post.setShareCount(rs.getInt("share_count"));
+
+                post.setComments(commentDAO.getCommentsByPostIdInternal(conn, post.getId()));
+
+                list.add(post);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+        // ================= GET POSTS BY USER =================
+    public List<UsersPost> getPostsByUserId(int userId) {
+        List<UsersPost> list = new ArrayList<>();
+        // প্রোফাইল পেজে ইউজারের নিজের সব পোস্ট (অরিজিনাল এবং শেয়ার করা) পাওয়ার জন্য ডিরেক্ট টেবিল কুয়েরি করা হচ্ছে
+        String sql = "SELECT p.id as posts_id, u.name, p.user_id, p.content, p.file_name, p.post_type, p.feeling, u.profile_pic, p.created_at, p.share_count " +
+                     "FROM posts p " +
+                     "JOIN users u ON p.user_id = u.id " +
+                     "WHERE p.user_id = ? " +
+                     "ORDER BY p.id DESC";
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setInt(1, userId);
-            ps.setString(2, newContent);
-            ps.setString(3, fileName);   // 🔥 COPY MEDIA
-            ps.setString(4, postType);   // 🔥 COPY TYPE
+            try (ResultSet rs = ps.executeQuery()) {
+                CommentDAO commentDAO = new CommentDAO();
+                while (rs.next()) {
+                    UsersPost post = new UsersPost(
+                            rs.getInt("posts_id"),
+                            rs.getString("name"),
+                            rs.getInt("user_id"),
+                            rs.getString("content"),
+                            rs.getString("file_name"),
+                            rs.getString("post_type"),
+                            rs.getString("feeling")
+                    );
+                    post.setProfile_pic(rs.getString("profile_pic"));
+                    post.setTime(rs.getString("created_at"));
+                    
+                    // রিয়্যাকশন কাউন্ট সেট করা (অপ্টিমাইজড)
+                    post.setLikeCount(getInteractionCountInternal(conn, post.getId(), "LIKE"));
+                    post.setLoveCount(getInteractionCountInternal(conn, post.getId(), "LOVE"));
+                    post.setHahaCount(getInteractionCountInternal(conn, post.getId(), "HAHA"));
+                    post.setAngryCount(getInteractionCountInternal(conn, post.getId(), "ANGRY"));
+                    post.setCareCount(getInteractionCountInternal(conn, post.getId(), "CARE"));
+                    post.setWowCount(getInteractionCountInternal(conn, post.getId(), "WOW"));
+                    post.setSadCount(getInteractionCountInternal(conn, post.getId(), "SAD"));
+                    post.setDislikes(getInteractionCountInternal(conn, post.getId(), "DISLIKES"));
 
-            ps.executeUpdate();
+                    post.setCommentCount(commentDAO.getCommentCountInternal(conn, post.getId()));
+                    post.setShareCount(rs.getInt("share_count"));
+                    
+                    // 📝 Fetch comments for this post using the same connection
+                    post.setComments(commentDAO.getCommentsByPostIdInternal(conn, post.getId()));
 
+                    list.add(post);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error in getPostsByUserId: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // কানেকশন পাস করে কাউন্ট আনার জন্য ইন্টারনাল মেথড (পারফরম্যান্স ফিক্স)
+    private int getInteractionCountInternal(Connection conn, int postId, String type) {
+        String sql = "SELECT COUNT(*) FROM post_interactions WHERE post_id=? AND type=?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, postId);
+            ps.setString(2, type);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    // ================= GET SINGLE POST =================
+    public UsersPost getPostById(int postId) {
+        String sql = "SELECT p.*, u.name, u.profile_pic FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id=?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, postId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                UsersPost post = new UsersPost(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getInt("user_id"),
+                        rs.getString("content"),
+                        rs.getString("file_name"),
+                        rs.getString("post_type"),
+                        rs.getString("feeling")
+                );
+                post.setProfile_pic(rs.getString("profile_pic"));
+                post.setTime(rs.getString("created_at"));
+                
+                // রিয়্যাকশন কাউন্ট সেট করা (AJAX এর জন্য জরুরি)
+                post.setLikeCount(getInteractionCount(post.getId(), "LIKE"));
+                post.setLoveCount(getInteractionCount(post.getId(), "LOVE"));
+                post.setHahaCount(getInteractionCount(post.getId(), "HAHA"));
+                post.setAngryCount(getInteractionCount(post.getId(), "ANGRY"));
+                post.setCareCount(getInteractionCount(post.getId(), "CARE"));
+                post.setWowCount(getInteractionCount(post.getId(), "WOW"));
+                post.setSadCount(getInteractionCount(post.getId(), "SAD"));
+                post.setDislikes(getInteractionCount(post.getId(), "DISLIKES"));
+                
+                post.setCommentCount(new CommentDAO().getCommentCount(post.getId()));
+                post.setShareCount(rs.getInt("share_count"));
+                
+                return post;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // ================= SHARE POST (Media & Feeling সহ) =================
+    public boolean sharePost(int userId, String content, String ownerName, String fileName, String postType) {
+        return sharePost(userId, content, ownerName, fileName, postType, 0);
+    }
+
+    public boolean sharePost(int userId, String content, String ownerName, String fileName, String postType, int originalPostId) {
+        String newContent = "Shared from " + ownerName + ": " + content;
+        String insertSql = "INSERT INTO posts(user_id, content, file_name, post_type, feeling) VALUES (?, ?, ?, ?, ?)";
+        String updateSql = "UPDATE posts SET share_count = share_count + 1 WHERE id = ?";
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement psInsert = conn.prepareStatement(insertSql);
+                 PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
+                psInsert.setInt(1, userId);
+                psInsert.setString(2, newContent);
+                psInsert.setString(3, fileName);
+                psInsert.setString(4, postType);
+                psInsert.setString(5, null); 
+                psInsert.executeUpdate();
+
+                if (originalPostId > 0) {
+                    psUpdate.setInt(1, originalPostId);
+                    psUpdate.executeUpdate();
+                }
+
+                conn.commit();
+                return true;
+            } catch (Exception ex) {
+                conn.rollback();
+                throw ex;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // ================= LIKE / REACTION =================
+    public void handleInteraction(int postId, int userId, String type) {
+        String normalizedType = type.toUpperCase();
+        if (normalizedType.equals("DISLIKE")) {
+            normalizedType = "DISLIKES";
+        }
+        try (Connection conn = getConnection()) {
+            // Check existing reaction
+            String currentType = null;
+            PreparedStatement psCheck = conn.prepareStatement("SELECT type FROM post_interactions WHERE post_id=? AND user_id=?");
+            psCheck.setInt(1, postId);
+            psCheck.setInt(2, userId);
+            ResultSet rsCheck = psCheck.executeQuery();
+            if (rsCheck.next()) {
+                currentType = rsCheck.getString("type");
+            }
+            rsCheck.close();
+            psCheck.close();
+
+            // আগে যদি কোনো রিঅ্যাকশন থাকে তা ডিলিট করা (Toggle logic)
+            PreparedStatement ps1 = conn.prepareStatement(
+                    "DELETE FROM post_interactions WHERE post_id=? AND user_id=?");
+            ps1.setInt(1, postId);
+            ps1.setInt(2, userId);
+            ps1.executeUpdate();
+            ps1.close();
+
+            // নতুন রিঅ্যাকশন ইনসার্ট করা (যদি আগেরটার সমান না হয়)
+            if (currentType == null || !normalizedType.equals(currentType)) {
+                PreparedStatement ps2 = conn.prepareStatement(
+                        "INSERT INTO post_interactions(post_id, user_id, type) VALUES(?,?,?)");
+                ps2.setInt(1, postId);
+                ps2.setInt(2, userId);
+                ps2.setString(3, normalizedType);
+                ps2.executeUpdate();
+                ps2.close();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public List<UsersPost> getAllposts() {
-        List<UsersPost> list = new ArrayList<>();
-        String sql = "SELECT * FROM user_posts_view ORDER BY posts_id DESC";
+    // ================= COUNT REACTIONS =================
+    public int getInteractionCount(int postId, String type) {
+        String sql = "SELECT COUNT(*) FROM post_interactions WHERE post_id=? AND type=?";
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, postId);
+            ps.setString(2, type);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    public void addComment(int postId, int userId, String text, String fileName) {
+        // Database column names: post_id, user_id, comment_text, file_name
+        String sql = "INSERT INTO comments(post_id, user_id, comment_text, file_name) VALUES(?,?,?,?)";
+        
+        try (Connection conn = getConnection(); // Ekhane 'con' define kora holo
+             PreparedStatement ps = conn.prepareStatement(sql)) { // Ekhon 'con' kaj korbe
+            
+            ps.setInt(1, postId);
+            ps.setInt(2, userId);
+            ps.setString(3, text);
+            ps.setString(4, fileName);
+            
+            ps.executeUpdate();
+        } catch (Exception e) {
+            System.out.println("Comment Upload Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+
+
+    // ================= GET COMMENTS =================
+    // কমেন্ট এখন স্ট্রিং এর বদলে অবজেক্ট হিসেবে নিলে ভালো, তবে আপনার আগের কোড বজায় রাখা হয়েছে
+    public List<String> getCommentsByPostId(int postId) {
+        List<String> list = new ArrayList<>();
+        String sql = "SELECT comment_text FROM comments WHERE post_id=? ORDER BY id DESC";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, postId);
+            ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                int pid = rs.getInt("posts_id");
+                list.add(rs.getString("comment_text"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+    public List<UsersPost> searchPosts(String query) {
+        List<UsersPost> list = new ArrayList<>();
+        String sql = "SELECT * FROM user_posts_view WHERE content LIKE ? ORDER BY posts_id DESC LIMIT 20";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, "%" + query + "%");
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
                 UsersPost post = new UsersPost(
-                        pid, rs.getString("name"), rs.getInt("users_id"),
-                        rs.getString("content"), rs.getString("file_name"), rs.getString("post_type")
+                        rs.getInt("posts_id"),
+                        rs.getString("name"),
+                        rs.getInt("users_id"),
+                        rs.getString("content"),
+                        rs.getString("file_name"),
+                        rs.getString("post_type"),
+                        rs.getString("feeling")
                 );
-                post.setLikes(getInteractionCount(pid, "LIKE"));
-                post.setDislikes(getInteractionCount(pid, "DISLIKE"));
-                post.setComments(getCommentsByPostId(pid));
+                post.setProfile_pic(rs.getString("profile_pic"));
+                post.setTime(rs.getString("created_at"));
                 list.add(post);
             }
         } catch (Exception e) { e.printStackTrace(); }
         return list;
     }
 
-    public void handleInteraction(int postId, int userId, String type) {
+    public boolean deletePost(int postId) {
+        String delInteractions = "DELETE FROM post_interactions WHERE post_id = ?";
+        String delComments = "DELETE FROM comments WHERE post_id = ?";
+        String delPost = "DELETE FROM posts WHERE id = ?";
         try (Connection conn = getConnection()) {
-            PreparedStatement ps1 = conn.prepareStatement("DELETE FROM post_interactions WHERE post_id=? AND user_id=?");
-            ps1.setInt(1, postId); ps1.setInt(2, userId); ps1.executeUpdate();
-            PreparedStatement ps2 = conn.prepareStatement("INSERT INTO post_interactions(post_id, user_id, type) VALUES(?,?,?)");
-            ps2.setInt(1, postId); ps2.setInt(2, userId); ps2.setString(3, type); ps2.executeUpdate();
-        } catch (Exception e) { e.printStackTrace(); }
-    }
-
-    public int getInteractionCount(int postId, String type) {
-        String sql = "SELECT COUNT(*) FROM post_interactions WHERE post_id=? AND type=?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, postId); ps.setString(2, type);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return rs.getInt(1);
-        } catch (Exception e) { e.printStackTrace(); }
-        return 0;
-    }
-
-    public void addComment(int postId, int userId, String text) {
-        String sql = "INSERT INTO post_comments(post_id, user_id, comment_text) VALUES(?,?,?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, postId); ps.setInt(2, userId); ps.setString(3, text); ps.executeUpdate();
-        } catch (Exception e) { e.printStackTrace(); }
-    }
-
-    public List<String> getCommentsByPostId(int postId) {
-        List<String> list = new ArrayList<>();
-        String sql = "SELECT comment_text FROM post_comments WHERE post_id=? ORDER BY id DESC";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, postId);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) { 
-            	list.add(rs.getString("comment_text"));
-            	
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps1 = conn.prepareStatement(delInteractions);
+                 PreparedStatement ps2 = conn.prepareStatement(delComments);
+                 PreparedStatement ps3 = conn.prepareStatement(delPost)) {
+                 
+                ps1.setInt(1, postId);
+                ps1.executeUpdate();
+                
+                ps2.setInt(1, postId);
+                ps2.executeUpdate();
+                
+                ps3.setInt(1, postId);
+                boolean success = ps3.executeUpdate() > 0;
+                
+                conn.commit();
+                return success;
+            } catch (Exception e) {
+                conn.rollback();
+                e.printStackTrace();
+                return false;
             }
-            
-        } catch (Exception e) { e.printStackTrace(); }
-        return list;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
-    public UsersPost getPostById(int postId) {
+    // ================= SAVE POST =================
+    public boolean savePost(int userId, int postId) {
+        String sql = "INSERT IGNORE INTO saved_posts (user_id, post_id) VALUES (?, ?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, postId);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 
-        String sql = "SELECT * FROM user_posts_view WHERE posts_id=?";
+    // ================= UNSAVE POST =================
+    public boolean unsavePost(int userId, int postId) {
+        String sql = "DELETE FROM saved_posts WHERE user_id = ? AND post_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, postId);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // ================= IS POST SAVED =================
+    public boolean isPostSaved(int userId, int postId) {
+        String sql = "SELECT 1 FROM saved_posts WHERE user_id = ? AND post_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, postId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // ================= GET SAVED POSTS =================
+    public List<UsersPost> getSavedPosts(int userId) {
+        List<UsersPost> list = new ArrayList<>();
+        String sql =
+            "SELECT p.id AS posts_id, u.name, p.user_id AS users_id, p.content, p.file_name, p.post_type, p.feeling, " +
+            "       u.profile_pic, p.created_at, p.share_count, " +
+            "       SUM(CASE WHEN pi.type='LIKE'     THEN 1 ELSE 0 END) AS like_count, " +
+            "       SUM(CASE WHEN pi.type='LOVE'     THEN 1 ELSE 0 END) AS love_count, " +
+            "       SUM(CASE WHEN pi.type='CARE'     THEN 1 ELSE 0 END) AS care_count, " +
+            "       SUM(CASE WHEN pi.type='HAHA'     THEN 1 ELSE 0 END) AS haha_count, " +
+            "       SUM(CASE WHEN pi.type='WOW'      THEN 1 ELSE 0 END) AS wow_count, " +
+            "       SUM(CASE WHEN pi.type='SAD'      THEN 1 ELSE 0 END) AS sad_count, " +
+            "       SUM(CASE WHEN pi.type='ANGRY'    THEN 1 ELSE 0 END) AS angry_count, " +
+            "       SUM(CASE WHEN pi.type='DISLIKES'  THEN 1 ELSE 0 END) AS dislike_count " +
+            "FROM saved_posts sp " +
+            "JOIN posts p ON sp.post_id = p.id " +
+            "JOIN users u ON p.user_id = u.id " +
+            "LEFT JOIN post_interactions pi ON p.id = pi.post_id " +
+            "WHERE sp.user_id = ? " +
+            "GROUP BY p.id, u.name, p.user_id, p.content, p.file_name, p.post_type, p.feeling, u.profile_pic, p.created_at, p.share_count, sp.saved_at " +
+            "ORDER BY sp.saved_at DESC";
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    UsersPost up = new UsersPost();
+                    up.setId(rs.getInt("posts_id"));
+                    up.setName(rs.getString("name"));
+                    up.setUserId(rs.getInt("users_id"));
+                    up.setContent(rs.getString("content"));
+                    up.setFile_name(rs.getString("file_name"));
+                    up.setPost_type(rs.getString("post_type"));
+                    up.setFeeling(rs.getString("feeling"));
+                    up.setProfile_pic(rs.getString("profile_pic"));
+                    up.setTime(rs.getString("created_at"));
+                    up.setShareCount(rs.getInt("share_count"));
 
-            ps.setInt(1, postId);
+                    up.setLikeCount(rs.getInt("like_count"));
+                    up.setLoveCount(rs.getInt("love_count"));
+                    up.setCareCount(rs.getInt("care_count"));
+                    up.setHahaCount(rs.getInt("haha_count"));
+                    up.setWowCount(rs.getInt("wow_count"));
+                    up.setSadCount(rs.getInt("sad_count"));
+                    up.setAngryCount(rs.getInt("angry_count"));
+                    up.setDislikes(rs.getInt("dislike_count"));
 
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {
-
-                return new UsersPost(
-                    rs.getInt("posts_id"),
-                    rs.getString("name"),
-                    rs.getInt("users_id"),
-                    rs.getString("content"),
-                    rs.getString("file_name"),
-                    rs.getString("post_type")
-                );
+                    list.add(up);
+                }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return list;
+    }
 
-        return null;
+    // ================= GET MEMORIES POSTS =================
+    public List<UsersPost> getMemoriesPosts(int userId) {
+        List<UsersPost> list = new ArrayList<>();
+        String sql =
+            "SELECT p.id AS posts_id, u.name, p.user_id AS users_id, p.content, p.file_name, p.post_type, p.feeling, " +
+            "       u.profile_pic, p.created_at, p.share_count, " +
+            "       SUM(CASE WHEN pi.type='LIKE'     THEN 1 ELSE 0 END) AS like_count, " +
+            "       SUM(CASE WHEN pi.type='LOVE'     THEN 1 ELSE 0 END) AS love_count, " +
+            "       SUM(CASE WHEN pi.type='CARE'     THEN 1 ELSE 0 END) AS care_count, " +
+            "       SUM(CASE WHEN pi.type='HAHA'     THEN 1 ELSE 0 END) AS haha_count, " +
+            "       SUM(CASE WHEN pi.type='WOW'      THEN 1 ELSE 0 END) AS wow_count, " +
+            "       SUM(CASE WHEN pi.type='SAD'      THEN 1 ELSE 0 END) AS sad_count, " +
+            "       SUM(CASE WHEN pi.type='ANGRY'    THEN 1 ELSE 0 END) AS angry_count, " +
+            "       SUM(CASE WHEN pi.type='DISLIKES'  THEN 1 ELSE 0 END) AS dislike_count " +
+            "FROM posts p " +
+            "JOIN users u ON p.user_id = u.id " +
+            "LEFT JOIN post_interactions pi ON p.id = pi.post_id " +
+            "WHERE p.user_id = ? " +
+            "GROUP BY p.id, u.name, p.user_id, p.content, p.file_name, p.post_type, p.feeling, u.profile_pic, p.created_at, p.share_count " +
+            "ORDER BY p.created_at ASC " +
+            "LIMIT 10";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    UsersPost up = new UsersPost();
+                    up.setId(rs.getInt("posts_id"));
+                    up.setName(rs.getString("name"));
+                    up.setUserId(rs.getInt("users_id"));
+                    up.setContent(rs.getString("content"));
+                    up.setFile_name(rs.getString("file_name"));
+                    up.setPost_type(rs.getString("post_type"));
+                    up.setFeeling(rs.getString("feeling"));
+                    up.setProfile_pic(rs.getString("profile_pic"));
+                    up.setTime(rs.getString("created_at"));
+                    up.setShareCount(rs.getInt("share_count"));
+
+                    up.setLikeCount(rs.getInt("like_count"));
+                    up.setLoveCount(rs.getInt("love_count"));
+                    up.setCareCount(rs.getInt("care_count"));
+                    up.setHahaCount(rs.getInt("haha_count"));
+                    up.setWowCount(rs.getInt("wow_count"));
+                    up.setSadCount(rs.getInt("sad_count"));
+                    up.setAngryCount(rs.getInt("angry_count"));
+                    up.setDislikes(rs.getInt("dislike_count"));
+
+                    list.add(up);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }

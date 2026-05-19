@@ -20,6 +20,14 @@ public class EditProfileServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
+        HttpSession session = req.getSession();
+        UsersBeans ub = (UsersBeans) session.getAttribute("ub");
+
+        if (ub == null) {
+            res.sendRedirect("UsersLoginServlet");
+            return;
+        }
+
         req.getRequestDispatcher("/WEB-INF/jsp/editProfile.jsp").forward(req, res);
     }
 
@@ -36,11 +44,24 @@ public class EditProfileServlet extends HttpServlet {
             return;
         }
 
-        ub.setName(req.getParameter("name"));
-        ub.setEmail(req.getParameter("email"));
-        ub.setPass(req.getParameter("pass"));
+        String name = req.getParameter("name");
+        String email = req.getParameter("email");
+        String pass = req.getParameter("pass");
+
+        if (name != null && !name.trim().isEmpty()) {
+            ub.setName(name);
+        }
+        if (email != null && !email.trim().isEmpty()) {
+            ub.setEmail(email);
+        }
+        if (pass != null && !pass.trim().isEmpty()) {
+            ub.setPass(pass);
+        } else {
+            ub.setPass(null); // Keep old password
+        }
 
         if (UsersLogic.updateProfile(ub)) {
+            session.setAttribute("ub", ub); // Update session with new bean info
             res.sendRedirect("UsersProfileServlet?update=success");
         } else {
             res.sendRedirect("UsersProfileServlet?update=fail");

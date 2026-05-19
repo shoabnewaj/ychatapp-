@@ -18,7 +18,7 @@ public class MessagesPageServlet extends HttpServlet {
         // 🔥 friend list forward করতে চাইলে এখানে set করো (optional)
         // req.setAttribute("friendsList", yourList);
 
-        req.getRequestDispatcher("/WEB-INF/messages.jsp")
+        req.getRequestDispatcher("/messages.jsp")
            .forward(req, res);
     }
 }

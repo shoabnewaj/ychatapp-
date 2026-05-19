@@ -14,7 +14,7 @@ public class MessageDAO {
     private Connection getConnection() throws Exception {
         Class.forName("com.mysql.cj.jdbc.Driver");
         return DriverManager.getConnection(
-            "jdbc:mysql://localhost:3306/yourdb", "root", "password"
+            "jdbc:mysql://127.0.0.1:3306/ychatapp", "root", "1234"
         );
     }
 
@@ -24,7 +24,7 @@ public class MessageDAO {
         try (Connection con = getConnection()) {
 
             PreparedStatement ps = con.prepareStatement(
-                "SELECT * FROM messages WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?) ORDER BY id ASC"
+                "SELECT * FROM messages WHERE (sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?) ORDER BY id ASC"
             );
 
             ps.setString(1, u1);
@@ -36,9 +36,9 @@ public class MessageDAO {
 
             while(rs.next()){
                 list.add(new Message(
-                    rs.getString("sender"),
-                    rs.getString("receiver"),
-                    rs.getString("message")
+                    rs.getString("sender_id"),
+                    rs.getString("receiver_id"),
+                    rs.getString("message_text")
                 ));
             }
 
@@ -53,7 +53,7 @@ public class MessageDAO {
         try (Connection con = getConnection()) {
 
             PreparedStatement ps = con.prepareStatement(
-                "INSERT INTO messages(sender,receiver,message) VALUES(?,?,?)"
+                "INSERT INTO messages(sender_id,receiver_id,message_text) VALUES(?,?,?)"
             );
 
             ps.setString(1,s);

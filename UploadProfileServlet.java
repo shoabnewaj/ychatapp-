@@ -16,11 +16,7 @@ import ychatapp.model.beans.UsersBeans;
 import ychatapp.model.dao.UsersDAO;
 
 @WebServlet("/UploadProfileServlet")
-@MultipartConfig(
-    fileSizeThreshold = 1024 * 1024 * 1,   // 1MB
-    maxFileSize = 1024 * 1024 * 5,         // 5MB
-    maxRequestSize = 1024 * 1024 * 10      // 10MB
-)
+@MultipartConfig
 public class UploadProfileServlet extends HttpServlet {
 
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -29,7 +25,6 @@ public class UploadProfileServlet extends HttpServlet {
         HttpSession session = req.getSession();
         UsersBeans ub = (UsersBeans) session.getAttribute("ub");
 
-        // 🔒 Login check
         if (ub == null) {
             resp.sendRedirect("UsersLoginServlet");
             return;
@@ -38,39 +33,26 @@ public class UploadProfileServlet extends HttpServlet {
         try {
             Part filePart = req.getPart("profilePic");
 
-            // ❗ empty file check
-            if (filePart == null || filePart.getSize() == 0) {
-                resp.sendRedirect("UsersProfileServlet");
-                return;
-            }
+            if (filePart != null && filePart.getSize() > 0) {
 
-            // 🔥 unique filename
-            String fileName = System.currentTimeMillis() + "_" + filePart.getSubmittedFileName();
+                String fileName = System.currentTimeMillis() + "_" + filePart.getSubmittedFileName();
 
-            // 📁 uploads path
-            String uploadPath = getServletContext().getRealPath("/uploads");
-            File uploadDir = new File(uploadPath);
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
+                String uploadPath = getServletContext().getRealPath("/img");
+                File dir = new File(uploadPath);
+                if (!dir.exists()) dir.mkdirs();
 
-            // 💾 save file physically
-            filePart.write(uploadPath + File.separator + fileName);
+                filePart.write(uploadPath + File.separator + fileName);
 
-            // 🗄 DB update
-            UsersDAO dao = new UsersDAO();
-            boolean isUpdated = dao.updateProfilePic(ub.getId(), fileName);
+                UsersDAO dao = new UsersDAO();
+                dao.updateProfilePic(ub.getId(), fileName);
 
-            if (isUpdated) {
-                // ✅ Session update (Jate sathe sathe chhobi change hoy)
-                ub.setProfile_pic(fileName); 
+                ub.setProfile_pic(fileName);
             }
 
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        // 🔁 redirect back to profile
         resp.sendRedirect("UsersProfileServlet");
     }
 }

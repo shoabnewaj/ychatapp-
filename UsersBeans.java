@@ -36,4 +36,24 @@ public class UsersBeans implements Serializable {
     public void setProfile_pic(String profile_pic) { this.profile_pic = profile_pic; } // 👈 Servlet ekhon eta khunje pabe
     public void setPass(String pass) { this.pass = pass; }
     public void setHashedPass(String hashedPass) { this.hashedPass = hashedPass; }
+
+//existing fields er niche add
+    private String cover_pic;
+    private String bio;
+
+    public String getCover_pic() {
+        return cover_pic;
+    }
+
+    public void setCover_pic(String cover_pic) {
+        this.cover_pic = cover_pic;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(String bio) {
+        this.bio = bio;
+    }
 }

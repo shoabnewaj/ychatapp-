@@ -10,7 +10,7 @@ import java.util.List;
 
 public class NotificationDAO {
 
-    private static final String URL = "jdbc:mysql://localhost:3306/ychatapp";
+    private static final String URL = "jdbc:mysql://127.0.0.1:3306/ychatapp";
     private static final String USER = "root";
     private static final String PASS = "1234";
 
@@ -68,6 +68,21 @@ public class NotificationDAO {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ps.setString(2, message);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * ৩.১. ইউজারনেম দিয়ে নোটিফিকেশন অ্যাড করা (মেসেজ নোটিফিকেশনের জন্য)
+     */
+    public void addNotificationByUsername(String username, String message) {
+        String sql = "INSERT INTO notifications(user_id, message, is_read) SELECT id, ?, 0 FROM users WHERE name = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, message);
+            ps.setString(2, username);
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
